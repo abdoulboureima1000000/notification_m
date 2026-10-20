@@ -1,0 +1,8 @@
+__pycache__/
+*.py[cod]
+*$py.class
+*.json
+!package*.json
+.env
+venv/
+.venv/

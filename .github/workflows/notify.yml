@@ -1,0 +1,84 @@
+name: MovieAll Push Notifications
+
+on:
+  schedule:
+    # Executes every hour on the hour (UTC).
+    # The Python script automatically converts to Europe/Paris (or configured timezone)
+    # and checks if the current hour is configured in allowed_hours in MovieAll Admin.
+    - cron: '0 * * * *'
+
+  workflow_dispatch:
+    inputs:
+      force_send:
+        description: 'Forcer l envoi immediat (ignore quotas et horaires)'
+        required: false
+        type: boolean
+        default: false
+      type_override:
+        description: 'Forcer un type specifique'
+        required: false
+        type: choice
+        options:
+          - 'auto'
+          - 'film'
+          - 'serie'
+          - 'anime'
+          - 'animation'
+        default: 'auto'
+      dry_run:
+        description: 'Simulation uniquement (pas d envoi reel aux utilisateurs)'
+        required: false
+        type: boolean
+        default: false
+
+concurrency:
+  group: movieall-push-notifications
+  cancel-in-progress: false
+
+jobs:
+  dispatch-notifications:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: 📥 Cloner le repository
+        uses: actions/checkout@v4
+
+      - name: 🐍 Configurer Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: |
+            notification_github_action/requirements.txt
+            requirements.txt
+
+      - name: 📦 Installer les dependances
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f notification_github_action/requirements.txt ]; then
+            pip install -r notification_github_action/requirements.txt
+          else
+            pip install -r requirements.txt
+          fi
+
+      - name: 🔔 Executer le dispatcher de notification
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          ARGS=""
+          if [ "${{ inputs.force_send }}" = "true" ]; then
+            ARGS="$ARGS --force"
+          fi
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            ARGS="$ARGS --dry-run"
+          fi
+          if [ "${{ inputs.type_override }}" != "auto" ] && [ -n "${{ inputs.type_override }}" ]; then
+            ARGS="$ARGS --type ${{ inputs.type_override }}"
+          fi
+
+          if [ -d "notification_github_action" ]; then
+            cd notification_github_action
+          fi
+
+          python notify.py $ARGS
