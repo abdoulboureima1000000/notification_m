@@ -85,9 +85,17 @@ def init_firebase(service_account_arg: Optional[str] = None):
 
     # 2. From environment variable
     if not cred and os.environ.get('FIREBASE_SERVICE_ACCOUNT'):
-        raw = os.environ['FIREBASE_SERVICE_ACCOUNT'].strip()
+        raw = os.environ['FIREBASE_SERVICE_ACCOUNT']
+        # Remove null bytes or decode if UTF-16 passed
+        if '\x00' in raw:
+            try:
+                raw = raw.encode('latin1', errors='ignore').decode('utf-16', errors='ignore')
+            except Exception:
+                raw = raw.replace('\x00', '')
+        raw = raw.lstrip('\ufeff').strip()
+
         # Could be a file path
-        if os.path.exists(raw):
+        if len(raw) < 500 and os.path.exists(raw):
             print(f"[Firebase] Using service account file from ENV: {raw}")
             cred = credentials.Certificate(raw)
         else:
@@ -96,14 +104,14 @@ def init_firebase(service_account_arg: Optional[str] = None):
                 json_data = json.loads(raw)
                 print("[Firebase] Using service account from raw JSON in ENV.")
                 cred = credentials.Certificate(json_data)
-            except Exception:
+            except Exception as json_err:
                 try:
-                    decoded = base64.b64decode(raw).decode('utf-8')
+                    decoded = base64.b64decode(raw.encode('ascii', errors='ignore')).decode('utf-8')
                     json_data = json.loads(decoded)
                     print("[Firebase] Using service account from Base64 decoded ENV.")
                     cred = credentials.Certificate(json_data)
                 except Exception as b64_err:
-                    print(f"[Firebase] Warning: Failed to parse FIREBASE_SERVICE_ACCOUNT: {b64_err}")
+                    print(f"[Firebase] Warning: Failed to parse FIREBASE_SERVICE_ACCOUNT: JSON error ({json_err}), B64 error ({b64_err})")
 
     # 3. Auto-detect local service account in workspace
     if not cred:
