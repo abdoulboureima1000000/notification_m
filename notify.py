@@ -252,11 +252,10 @@ def send_multicast_notifications(tokens: List[str], item: Dict) -> Tuple[int, in
     android_config = messaging.AndroidConfig(
         priority='high',
         notification=messaging.AndroidNotification(
-            icon='ic_notification',
             color='#6366F1',
-            channel_id='movieall_novelties',
             sound='default',
             default_vibrate_timings=True,
+            default_sound=True,
             image=poster_url if poster_url.startswith('http') else None,
         ),
     )
